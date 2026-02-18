@@ -42,8 +42,6 @@
 </div>
 
 <script>
-let deleteId = null;
-
 document.getElementById("todoForm").addEventListener("submit", function(e){
     e.preventDefault();
 
@@ -54,29 +52,32 @@ document.getElementById("todoForm").addEventListener("submit", function(e){
         },
         body: new FormData(this)
     })
-    .then(res => res.json())
-    .then(data => location.reload());
-});
-
-function openDeleteModal(id){
-    deleteId = id;
-    new bootstrap.Modal(document.getElementById('deleteModal')).show();
-}
-
-document.getElementById("confirmDeleteBtn").onclick = function(){
-    fetch(`/delete/${deleteId}/`)
-    .then(res => res.json())
+    .then(response => response.json())
     .then(data => {
-        document.getElementById(`todo-${deleteId}`).remove();
-        location.reload();
-    });
-};
 
-function toggleComplete(id){
-    fetch(`/toggle/${id}/`)
-    .then(res => res.json())
-    .then(data => location.reload());
-}
+        const todoList = document.getElementById("todoList");
+
+        const newTodo = `
+            <div class="card mt-2 p-3" id="todo-${data.id}">
+                <h5>${data.title}</h5>
+                <p>${data.description}</p>
+
+                <button onclick="toggleComplete(${data.id})" class="btn btn-success btn-sm">
+                    Complete
+                </button>
+
+                <button onclick="openDeleteModal(${data.id})" class="btn btn-danger btn-sm">
+                    Delete
+                </button>
+            </div>
+        `;
+
+        todoList.insertAdjacentHTML("afterbegin", newTodo);
+
+        document.getElementById("todoForm").reset();
+    });
+});
 </script>
+
 
 {% endblock %}

@@ -23,27 +23,38 @@ def add_todo(request):
         title = request.POST.get("title")
         description = request.POST.get("description")
 
-        TodoItem.objects.create(
+        todo = TodoItem.objects.create(
             user=request.user,
             title=title,
             description=description
         )
 
-        return redirect("home")  # or redirect to todos page
+        return JsonResponse({
+            "id": todo.id,
+            "title": todo.title,
+            "description": todo.description,
+            "completed": todo.completed
+        })
 
-    return render(request, "add_todo.html")
+    return JsonResponse({"error": "Invalid request"}, status=400)
+
 
 
 
 @login_required
+@login_required
 def update_todo(request, id):
-    todo = get_object_or_404(TodoItem, id=id, user=request.user)
+    if request.method == "POST":
+        todo = get_object_or_404(TodoItem, id=id, user=request.user)
 
-    todo.title = request.POST.get("title")
-    todo.description = request.POST.get("description")
-    todo.save()
+        todo.title = request.POST.get("title")
+        todo.description = request.POST.get("description")
+        todo.save()
 
-    return JsonResponse({"status": "updated"})
+        return JsonResponse({"status": "updated"})
+
+    return JsonResponse({"error": "Invalid request"}, status=400)
+
 
 
 @login_required
