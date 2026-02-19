@@ -16,10 +16,18 @@
 
 <hr>
 
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <span>Filter:</span>
+    <button class="btn btn-filter active" onclick="filterTodos('all', this)">All</button>
+    <button class="btn btn-filter" onclick="filterTodos('active', this)">Active</button>
+    <button class="btn btn-filter" onclick="filterTodos('completed', this)">Completed</button>
+</div>
+
 <!-- Todo List -->
 <ul id="todo-list" class="todo-list">
     {% for todo in todos %}
-    <li data-id="{{ todo.id }}" class="todo-card {% if todo.completed %}completed{% endif %}">
+    <li data-id="{{ todo.id }}" data-completed="{{ todo.completed|yesno:'true,false' }}" class="todo-card {% if todo.completed %}completed{% endif %}">
         <div class="todo-content">
             <div class="todo-title"><strong>{{ todo.title }}</strong></div>
             <div class="todo-desc">{{ todo.description }}</div>
@@ -53,102 +61,6 @@
     {% endfor %}
 </ul>
 
-<style>
-/* Toast */
-.toast {
-    display: none;
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #333;
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 8px;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-}
-
-/* Input & Buttons */
-.input-field {
-    display: block;
-    width: 100%;
-    max-width: 400px;
-    margin-bottom: 10px;
-    padding: 8px 12px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    font-size: 14px;
-}
-
-.btn {
-    padding: 6px 12px;
-    border-radius: 5px;
-    border: none;
-    cursor: pointer;
-    background-color: #4CAF50;
-    color: white;
-    font-weight: bold;
-    transition: background-color 0.3s, transform 0.1s;
-    margin-right: 5px;
-}
-
-.btn:hover { background-color: #45a049; }
-.btn:active { transform: scale(0.97); }
-.btn-delete { background-color: #f44336; }
-.btn-delete:hover { background-color: #d32f2f; }
-.btn-cancel { background-color: #999; }
-.btn-cancel:hover { background-color: #777; }
-
-/* Todo Card */
-.todo-card {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    transition: background-color 0.3s, transform 0.3s, opacity 0.3s;
-}
-
-.todo-card.new-todo {
-    background-color: #e0ffe0;
-    opacity: 0;
-    transform: translateY(-20px);
-    animation: fadeSlideIn 0.5s forwards;
-}
-
-@keyframes fadeSlideIn {
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.todo-card.completed {
-    background-color: #f0f0f0;
-    color: #555;
-}
-.todo-card.completed .todo-title,
-.todo-card.completed .todo-desc { text-decoration: line-through; opacity: 0.7; }
-
-/* Edit Form & Delete Confirmation Slide */
-.edit-form, .delete-confirm-form {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.5s ease, padding 0.5s ease;
-    margin-top: 0;
-    padding: 0 0;
-    border-top: 1px dashed #ccc;
-}
-
-.edit-form.show, .delete-confirm-form.show {
-    max-height: 500px; /* enough to show content */
-    padding: 10px 0;
-}
-
-/* Todo list */
-.todo-list { padding: 0; list-style: none; }
-.todo-content div { margin-bottom: 6px; }
-.edit-buttons, .delete-confirm-form button { margin-top: 5px; }
-</style>
-
 <script>
 const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 const toast = document.getElementById("toast");
@@ -159,24 +71,43 @@ function showToast(message){
     toast.style.opacity = 1;
     setTimeout(()=>{ 
         toast.style.opacity = 0; 
-        setTimeout(()=>toast.style.display="none",500)
-    },3000);
+        setTimeout(()=>toast.style.display="none", 500);
+    }, 3000);
 }
 
-// Add Todo dynamically
+function filterTodos(type, btn) {
+    // Update active button style
+    document.querySelectorAll('.filter-bar .btn-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Show/hide cards
+    document.querySelectorAll('#todo-list li').forEach(li => {
+        const isCompleted = li.dataset.completed === 'true';
+        if (type === 'all') {
+            li.style.display = '';
+        } else if (type === 'completed') {
+            li.style.display = isCompleted ? '' : 'none';
+        } else if (type === 'active') {
+            li.style.display = !isCompleted ? '' : 'none';
+        }
+    });
+}
+
+// Add Todo
 document.getElementById("todo-form").addEventListener("submit", function(e){
     e.preventDefault();
     const title = document.getElementById("title").value;
     const description = document.getElementById("description").value;
 
     fetch("{% url 'add_todo' %}", {
-        method:"POST",
-        headers:{"Content-Type":"application/x-www-form-urlencoded","X-CSRFToken": csrftoken},
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": csrftoken},
         body: `title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}`
-    }).then(res=>res.json()).then(todo=>{
+    }).then(res => res.json()).then(todo => {
         const li = document.createElement("li");
         li.dataset.id = todo.id;
-        li.classList.add("todo-card","new-todo");
+        li.dataset.completed = "false";
+        li.classList.add("todo-card", "new-todo");
         li.innerHTML = `
             <div class="todo-content">
                 <div class="todo-title"><strong>${todo.title}</strong></div>
@@ -211,55 +142,46 @@ document.getElementById("todo-form").addEventListener("submit", function(e){
 // Delegate actions
 document.getElementById("todo-list").addEventListener("click", function(e){
     const li = e.target.closest("li");
+    if (!li) return;
     const id = li.dataset.id;
 
-    // Toggle edit form slide
-    if(e.target.classList.contains("edit-btn")){
+    if (e.target.classList.contains("edit-btn"))
         li.querySelector(".edit-form").classList.toggle("show");
-    }
 
-    // Toggle delete confirmation slide
-    if(e.target.classList.contains("delete-btn")){
+    if (e.target.classList.contains("delete-btn"))
         li.querySelector(".delete-confirm-form").classList.toggle("show");
-    }
 
-    // Cancel edit
-    if(e.target.classList.contains("cancel-edit-btn")){
+    if (e.target.classList.contains("cancel-edit-btn"))
         li.querySelector(".edit-form").classList.remove("show");
-    }
 
-    // Cancel delete
-    if(e.target.classList.contains("cancel-delete-btn")){
+    if (e.target.classList.contains("cancel-delete-btn"))
         li.querySelector(".delete-confirm-form").classList.remove("show");
+
+    if (e.target.classList.contains("confirm-delete-btn")){
+        fetch(`/delete/${id}/`, {method: "POST", headers: {"X-CSRFToken": csrftoken}})
+        .then(() => { li.remove(); showToast("Todo deleted!"); });
     }
 
-    // Confirm delete
-    if(e.target.classList.contains("confirm-delete-btn")){
-        fetch(`/delete/${id}/`, {method:"POST", headers:{"X-CSRFToken": csrftoken}})
-        .then(()=> { li.remove(); showToast("Todo deleted!"); });
-    }
-
-    // Checkbox complete
-    if(e.target.classList.contains("complete-checkbox")){
-        fetch(`/toggle/${id}/`, {method:"POST", headers:{"X-CSRFToken": csrftoken}})
-        .then(res=>res.json())
-        .then(data=>{
+    if (e.target.classList.contains("complete-checkbox")){
+        fetch(`/toggle/${id}/`, {method: "POST", headers: {"X-CSRFToken": csrftoken}})
+        .then(res => res.json())
+        .then(data => {
             li.classList.toggle("completed", data.completed);
+            li.dataset.completed = data.completed ? "true" : "false";
             showToast(data.completed ? "Marked complete!" : "Marked incomplete!");
         });
     }
 
-    // Save edit
-    if(e.target.classList.contains("save-edit-btn")){
+    if (e.target.classList.contains("save-edit-btn")){
         e.preventDefault();
         const newTitle = li.querySelector(".edit-title").value;
         const newDesc = li.querySelector(".edit-description").value;
 
         fetch(`/update/${id}/`, {
-            method:"POST",
-            headers:{"Content-Type":"application/x-www-form-urlencoded","X-CSRFToken": csrftoken},
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded", "X-CSRFToken": csrftoken},
             body: `title=${encodeURIComponent(newTitle)}&description=${encodeURIComponent(newDesc)}`
-        }).then(()=>{
+        }).then(() => {
             li.querySelector(".todo-title strong").textContent = newTitle;
             li.querySelector(".todo-desc").textContent = newDesc;
             li.querySelector(".edit-form").classList.remove("show");
